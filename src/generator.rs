@@ -125,14 +125,14 @@ impl FixGenerator {
                     let variant_name = fix_value_to_enum_variant(&value.description);
                     writeln!(
                         file,
-                        "            {}::{} => write!(f, \"{}\")",
+                        "            {}::{} => write!(f, \"{}\"),",
                         enum_name, variant_name, value.enum_value
                     )?;
                 }
 
                 writeln!(
                     file,
-                    "            {}::Unknown(s) => write!(f, \"{{}}\")",
+                    "            {}::Unknown(s) => write!(f, \"{{s}}\"),",
                     enum_name
                 )?;
                 writeln!(file, "        }}")?;
@@ -230,14 +230,14 @@ impl FixGenerator {
             let msg_variant = message.name.replace(" ", "");
             writeln!(
                 file,
-                "            MessageType::{} => write!(f, \"{}\")",
+                "            MessageType::{} => write!(f, \"{}\"),",
                 msg_variant, message.msg_type
             )?;
         }
 
         writeln!(
             file,
-            "            MessageType::Unknown(s) => write!(f, \"{{}}\")"
+            "            MessageType::Unknown(s) => write!(f, \"{{s}}\"),"
         )?;
         writeln!(file, "        }}")?;
         writeln!(file, "    }}")?;

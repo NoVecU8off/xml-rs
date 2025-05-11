@@ -71,8 +71,6 @@ pub fn generate_common<P: AsRef<Path>>(output_dir: P) -> Result<(), Box<dyn std:
         "// DO NOT EDIT - This file was automatically generated"
     )?;
     writeln!(file, "")?;
-    writeln!(file, "use chrono::{{NaiveDate, NaiveDateTime, NaiveTime}};")?;
-    writeln!(file, "")?;
     writeln!(
         file,
         "/// Trait for converting between FIX messages and Rust types"
@@ -103,7 +101,7 @@ pub fn generate_common<P: AsRef<Path>>(output_dir: P) -> Result<(), Box<dyn std:
     writeln!(file, "pub mod convert {{")?;
     writeln!(
         file,
-        "    use chrono::{{NaiveDate, NaiveDateTime, NaiveTime}};"
+        "    use chrono::{{NaiveDate, NaiveDateTime, NaiveTime, Datelike, Timelike}};"
     )?;
     writeln!(file, "")?;
     writeln!(file, "    /// Parse a FIX boolean value (Y/N)")?;
@@ -258,3 +256,7 @@ pub fn generate_common<P: AsRef<Path>>(output_dir: P) -> Result<(), Box<dyn std:
 
     Ok(())
 }
+pub mod common;
+pub mod fix41;
+pub mod fix40;
+pub mod fixt11;
