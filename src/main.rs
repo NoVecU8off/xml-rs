@@ -1,5 +1,4 @@
 #![allow(dead_code)]
-pub mod codec;
 pub mod generator;
 pub mod model;
 pub mod output;

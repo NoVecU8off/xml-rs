@@ -46,12 +46,16 @@ impl FixParser {
                     QName(b"fields") => in_fields = true,
                     QName(b"field") if in_header => {
                         if let Some(ref mut fix) = fix_version {
-                            fix.header.fields.push(Self::parse_field_ref(e)?);
+                            fix.header
+                                .fields
+                                .push(Self::parse_field_ref(e, &mut reader)?);
                         }
                     }
                     QName(b"field") if in_trailer => {
                         if let Some(ref mut fix) = fix_version {
-                            fix.trailer.fields.push(Self::parse_field_ref(e)?);
+                            fix.trailer
+                                .fields
+                                .push(Self::parse_field_ref(e, &mut reader)?);
                         }
                     }
                     QName(b"group") if in_header => {
@@ -90,6 +94,25 @@ impl FixParser {
                     QName(b"messages") => in_messages = false,
                     QName(b"components") => in_components = false,
                     QName(b"fields") => in_fields = false,
+                    _ => {}
+                },
+                Ok(Event::Empty(ref e)) => match e.name() {
+                    QName(b"field") if in_header => {
+                        if let Some(ref mut fix) = fix_version {
+                            fix.header.fields.push(Self::parse_field_ref_empty(e)?);
+                        }
+                    }
+                    QName(b"field") if in_trailer => {
+                        if let Some(ref mut fix) = fix_version {
+                            fix.trailer.fields.push(Self::parse_field_ref_empty(e)?);
+                        }
+                    }
+                    QName(b"field") if in_fields => {
+                        if let Some(ref mut fix) = fix_version {
+                            let field = Self::parse_field_empty(e)?;
+                            fix.fields.insert(field.number, field);
+                        }
+                    }
                     _ => {}
                 },
                 Ok(Event::Eof) => break,
@@ -131,8 +154,8 @@ impl FixParser {
         Ok(FixVersion::new(&protocol_type, major, minor, servicepack))
     }
 
-    /// Parse a field reference (used in headers, trailers, messages)
-    fn parse_field_ref(e: &BytesStart) -> Result<FieldRef, Box<dyn std::error::Error>> {
+    /// Parse a field reference (used in headers, trailers, messages) - for empty tags
+    fn parse_field_ref_empty(e: &BytesStart) -> Result<FieldRef, Box<dyn std::error::Error>> {
         let mut name = String::new();
         let mut required = false;
 
@@ -151,8 +174,30 @@ impl FixParser {
         Ok(FieldRef { name, required })
     }
 
-    /// Parse a component reference
-    fn parse_component_ref(e: &BytesStart) -> Result<ComponentRef, Box<dyn std::error::Error>> {
+    /// Parse a field reference (used in headers, trailers, messages)
+    fn parse_field_ref(
+        e: &BytesStart,
+        reader: &mut Reader<&[u8]>,
+    ) -> Result<FieldRef, Box<dyn std::error::Error>> {
+        let field_ref = Self::parse_field_ref_empty(e)?;
+
+        // Consume any content until the end tag
+        loop {
+            match reader.read_event() {
+                Ok(Event::End(ref end_e)) if end_e.name() == QName(b"field") => break,
+                Ok(Event::Eof) => return Err("Unexpected EOF while parsing field".into()),
+                Err(e) => return Err(Box::new(e)),
+                _ => {} // Skip any other events
+            }
+        }
+
+        Ok(field_ref)
+    }
+
+    /// Parse a component reference - for empty tags
+    fn parse_component_ref_empty(
+        e: &BytesStart,
+    ) -> Result<ComponentRef, Box<dyn std::error::Error>> {
         let mut name = String::new();
         let mut required = false;
 
@@ -169,6 +214,26 @@ impl FixParser {
         }
 
         Ok(ComponentRef { name, required })
+    }
+
+    /// Parse a component reference
+    fn parse_component_ref(
+        e: &BytesStart,
+        reader: &mut Reader<&[u8]>,
+    ) -> Result<ComponentRef, Box<dyn std::error::Error>> {
+        let component_ref = Self::parse_component_ref_empty(e)?;
+
+        // Consume any content until the end tag
+        loop {
+            match reader.read_event() {
+                Ok(Event::End(ref end_e)) if end_e.name() == QName(b"component") => break,
+                Ok(Event::Eof) => return Err("Unexpected EOF while parsing component".into()),
+                Err(e) => return Err(Box::new(e)),
+                _ => {} // Skip any other events
+            }
+        }
+
+        Ok(component_ref)
     }
 
     /// Parse a repeating group
@@ -199,13 +264,22 @@ impl FixParser {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => match e.name() {
                     QName(b"field") => {
-                        fields.push(Self::parse_field_ref(e)?);
+                        fields.push(Self::parse_field_ref(e, reader)?);
                     }
                     QName(b"group") => {
                         groups.push(Self::parse_group(e, reader)?);
                     }
                     QName(b"component") => {
-                        components.push(Self::parse_component_ref(e)?);
+                        components.push(Self::parse_component_ref(e, reader)?);
+                    }
+                    _ => {}
+                },
+                Ok(Event::Empty(ref e)) => match e.name() {
+                    QName(b"field") => {
+                        fields.push(Self::parse_field_ref_empty(e)?);
+                    }
+                    QName(b"component") => {
+                        components.push(Self::parse_component_ref_empty(e)?);
                     }
                     _ => {}
                 },
@@ -257,13 +331,22 @@ impl FixParser {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => match e.name() {
                     QName(b"field") => {
-                        fields.push(Self::parse_field_ref(e)?);
+                        fields.push(Self::parse_field_ref(e, reader)?);
                     }
                     QName(b"group") => {
                         groups.push(Self::parse_group(e, reader)?);
                     }
                     QName(b"component") => {
-                        components.push(Self::parse_component_ref(e)?);
+                        components.push(Self::parse_component_ref(e, reader)?);
+                    }
+                    _ => {}
+                },
+                Ok(Event::Empty(ref e)) => match e.name() {
+                    QName(b"field") => {
+                        fields.push(Self::parse_field_ref_empty(e)?);
+                    }
+                    QName(b"component") => {
+                        components.push(Self::parse_component_ref_empty(e)?);
                     }
                     _ => {}
                 },
@@ -312,13 +395,22 @@ impl FixParser {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => match e.name() {
                     QName(b"field") => {
-                        fields.push(Self::parse_field_ref(e)?);
+                        fields.push(Self::parse_field_ref(e, reader)?);
                     }
                     QName(b"group") => {
                         groups.push(Self::parse_group(e, reader)?);
                     }
                     QName(b"component") => {
-                        components.push(Self::parse_component_ref(e)?);
+                        components.push(Self::parse_component_ref(e, reader)?);
+                    }
+                    _ => {}
+                },
+                Ok(Event::Empty(ref e)) => match e.name() {
+                    QName(b"field") => {
+                        fields.push(Self::parse_field_ref_empty(e)?);
+                    }
+                    QName(b"component") => {
+                        components.push(Self::parse_component_ref_empty(e)?);
                     }
                     _ => {}
                 },
@@ -336,6 +428,34 @@ impl FixParser {
             fields,
             groups,
             components,
+        })
+    }
+
+    /// Parse a field - for empty tags
+    fn parse_field_empty(e: &BytesStart) -> Result<Field, Box<dyn std::error::Error>> {
+        let mut number = 0;
+        let mut name = String::new();
+        let mut field_type = String::new();
+        let values = Vec::new();
+
+        for attr in e.attributes() {
+            let attr = attr?;
+            let value = attr.value;
+            let value_str = std::str::from_utf8(&value)?;
+
+            match attr.key {
+                QName(b"number") => number = value_str.parse()?,
+                QName(b"name") => name = value_str.to_string(),
+                QName(b"type") => field_type = value_str.to_string(),
+                _ => {}
+            }
+        }
+
+        Ok(Field {
+            number,
+            name,
+            field_type,
+            values,
         })
     }
 
@@ -366,6 +486,43 @@ impl FixParser {
         loop {
             match reader.read_event() {
                 Ok(Event::Start(ref e)) => {
+                    if e.name() == QName(b"value") {
+                        let mut enum_value = String::new();
+                        let mut description = String::new();
+
+                        for attr in e.attributes() {
+                            let attr = attr?;
+                            let value = attr.value;
+                            let value_str = std::str::from_utf8(&value)?;
+
+                            match attr.key {
+                                QName(b"enum") => enum_value = value_str.to_string(),
+                                QName(b"description") => description = value_str.to_string(),
+                                _ => {}
+                            }
+                        }
+
+                        values.push(FieldValue {
+                            enum_value,
+                            description,
+                        });
+
+                        // Consume the end tag for value
+                        loop {
+                            match reader.read_event() {
+                                Ok(Event::End(ref end_e)) if end_e.name() == QName(b"value") => {
+                                    break
+                                }
+                                Ok(Event::Eof) => {
+                                    return Err("Unexpected EOF while parsing value".into());
+                                }
+                                Err(e) => return Err(Box::new(e)),
+                                _ => {} // Skip any other events
+                            }
+                        }
+                    }
+                }
+                Ok(Event::Empty(ref e)) => {
                     if e.name() == QName(b"value") {
                         let mut enum_value = String::new();
                         let mut description = String::new();

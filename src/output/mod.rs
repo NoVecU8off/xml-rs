@@ -258,5 +258,4 @@ pub fn generate_common<P: AsRef<Path>>(output_dir: P) -> Result<(), Box<dyn std:
 }
 pub mod common;
 pub mod fix41;
-pub mod fix40;
 pub mod fixt11;

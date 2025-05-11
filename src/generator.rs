@@ -77,6 +77,7 @@ impl FixGenerator {
                 let enum_name = fix_field_to_enum_name(&field.name);
 
                 writeln!(file, "#[derive(Debug, Clone, PartialEq)]")?;
+                writeln!(file, "#[allow(non_camel_case_types)]")?;
                 writeln!(file, "pub enum {} {{", enum_name)?;
 
                 // Add enum variants
