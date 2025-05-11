@@ -1,0 +1,8 @@
+[package]
+name = "xml-rs-test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quick-xml = "0.37.5"
+chrono = "0.4"
