@@ -99,7 +99,10 @@ impl FixParser {
         }
 
         match fix_version {
-            Some(fix) => Ok(fix),
+            Some(fix) => {
+                println!("\n{fix:?}\n");
+                Ok(fix)
+            }
             None => Err("No FIX version found in XML".into()),
         }
     }
